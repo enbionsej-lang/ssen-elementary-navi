@@ -99,4 +99,71 @@ $('csvExportButton').onclick=()=>{const quote=x=>'"'+String(x??'').replace(/"/g,
 render();
 
 })();
+</script><style>
+main{display:flex;flex-direction:column;max-width:1000px}.report-panel{order:1}.editor{order:2}.quick-panel{order:0;display:flex;align-items:center;gap:12px;flex-wrap:wrap}.quick-panel select{flex:1;min-width:160px}.quick-panel button{padding:13px}.card{max-width:none;box-shadow:none;padding:8px}.report-panel>h2{display:none}.editor:not(.is-open){display:none}header{background:#074b38}.card-head{letter-spacing:1px}.card h2{font-size:clamp(25px,5vw,36px)}.identity{font-size:17px;margin:12px 0 22px}.destination{background:#07533d;color:white;border-radius:18px;padding:24px;margin:20px 0}.destination small{font-size:15px;color:#c5e9db}.destination strong{display:block;font-size:clamp(28px,6vw,40px);margin:8px 0}.destination p{margin:6px 0;font-size:17px}.map-group{display:grid;grid-template-columns:80px 1fr;gap:10px;align-items:start;margin:12px 0}.map-tiles{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}.map-tile{background:#f0f3f2;padding:12px 3px;border-radius:9px;text-align:center;font-size:14px;color:#74827e}.map-tile.in-route{background:#d7f0df;color:#15573b}.map-tile.endpoint{background:#086345;color:white;font-weight:800}.map-tile span{display:block;font-size:12px;margin-top:4px}.road-heading{font-size:21px;margin-top:28px}.focus-box{border:2px solid #08764f;border-radius:16px;background:#effaf3;padding:20px}.focus-box strong{font-size:23px;display:block;margin:8px 0}.focus-box p{line-height:1.7;margin:8px 0}.month-line{display:grid;grid-template-columns:100px 1fr;gap:14px;padding:16px;border-left:3px solid #159565;background:#f5f9f6;margin:9px 0;border-radius:0 12px 12px 0}.month-line b{color:#075c40}.month-line span{display:block;line-height:1.7}.state-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.state-item{background:#f3f7f5;padding:12px;border-radius:10px;font-size:14px}.state-item small{display:block;margin-top:6px;color:#526e61}.comment{white-space:pre-wrap;line-height:1.8;background:#edf7f0;padding:20px;border-radius:14px}.notice,.small{font-size:14px}button,input,select,textarea{font-size:16px}label{font-size:14px}.empty{text-align:center;padding:45px 20px}.empty p{line-height:1.8;color:#61766b}@media(max-width:600px){main{padding:10px}.panel{padding:16px}.map-group{grid-template-columns:1fr}.map-tiles{grid-template-columns:repeat(6,1fr)}.map-tile{font-size:12px;padding:10px 2px}.month-line{grid-template-columns:80px 1fr}.state-grid{grid-template-columns:1fr}.quick-panel{gap:8px}.quick-panel strong{width:100%}}@media print{.quick-panel,.editor{display:none!important}.report-panel{padding:0}.destination,.map-tile,.focus-box,.month-line{-webkit-print-color-adjust:exact;print-color-adjust:exact}.month-line,.focus-box,.state-item{break-inside:avoid}}
+</style><script>
+(()=>{
+ const editor=document.querySelector('.editor'),reportPanel=$('report').parentElement;reportPanel.classList.add('report-panel');
+ const quick=document.createElement('section');quick.className='panel quick-panel';quick.innerHTML='<strong>학생별 수학 로드맵</strong><select id="quickStudent" aria-label="로드맵 학생 선택"></select><button id="toggleManage">학습 계획 수정</button><button id="quickPrint">인쇄 / PDF</button>';document.querySelector('main').prepend(quick);
+ $('toggleManage').onclick=()=>{const open=editor.classList.toggle('is-open');$('toggleManage').textContent=open?'결과 화면 보기':'학습 계획 수정';(open?editor:quick).scrollIntoView({behavior:'smooth',block:'start'})};$('quickPrint').onclick=()=>window.print();
+ $('quickStudent').onchange=e=>{db.selected=e.target.value;persist();render()};
+ const displaySemester=x=>x==='고1-1'?'공통수학1':x;
+ renderReport=function(){
+  $('quickStudent').innerHTML='<option value="">학생 선택</option>'+db.students.map(s=>`<option value="${esc(s.id)}">${esc(s.grade)} · ${esc(s.name)}</option>`).join('');$('quickStudent').value=db.selected||'';
+  const r=getReport();if(!r){$('report').innerHTML='<div class="empty"><h2>우리 아이 수학 로드맵</h2><p>학생을 선택하면 현재 위치와 목표까지의<br>학습 계획을 한눈에 볼 수 있어요.</p><button id="startManage" class="primary">학생 등록 · 백업 불러오기</button></div>';$('startManage').onclick=()=>$('toggleManage').click();return}
+  const {s,p,units,done,progress}=r;const a=semesters.indexOf(p.semester),b=semesters.indexOf(p.goal);const groups=[['초등',semesters.slice(0,12)],['중등',semesters.slice(12,18)],['고등 연결',['고1-1']]];
+  const items=(p.timeline||[]).slice().sort((x,y)=>(x.month||'').localeCompare(y.month||''));const grouped=[];for(const item of items){let g=grouped.find(x=>x.month===item.month);if(!g){g={month:item.month,items:[]};grouped.push(g)}g.items.push(item)}
+  const next=grouped.find(x=>x.month>=new Date().toLocaleDateString('sv-SE').slice(0,7));
+  $('report').innerHTML=`<div class="card-head">힘쎈플러스학원 · MATH NAVI</div><h2>우리 아이 수학 로드맵</h2><div class="identity"><b>${esc(s.name)}</b> · ${esc(s.grade)} <span class="small">/ ${currentTrack==='current'?'현행':'선행'} 학습</span></div><div class="destination"><small>최종 학습 목표 · ${esc(p.date?p.date.replaceAll('-','. '):'완료일 미설정')}</small><strong>${esc(displaySemester(p.goal))} 과정 완성</strong><p>현재 ${esc(displaySemester(p.semester))}에서 목표까지</p></div><h3 class="road-heading">전체 과정에서 지금 위치</h3>${groups.map(([label,list])=>`<div class="map-group"><b>${label}</b><div class="map-tiles">${list.map(t=>{const i=semesters.indexOf(t);return `<div class="map-tile ${i>=a&&i<=b?'in-route':''} ${t===p.semester||t===p.goal?'endpoint':''}">${esc(displaySemester(t))}${t===p.semester?'<span>현재</span>':''}${t===p.goal?'<span>목표</span>':''}</div>`}).join('')}</div></div>`).join('')}<h3 class="road-heading">가장 가까운 학습 목표</h3><div class="focus-box">${next?`<span>${esc(next.month.replace('-','년 '))}월까지</span><strong>${next.items.map(x=>esc(displaySemester(x.semester))+' '+esc(x.stage)).join(' · ')}</strong><p>계획된 학습을 마친 뒤 평가와 오답 점검을 진행합니다.</p>`:`<strong>${esc(displaySemester(p.semester))} 학습 중</strong><p>학습 계획 수정에서 목표일과 월별 계획을 설정해 주세요.</p>`}</div><h3 class="road-heading">목표까지의 월별 학습 계획</h3>${grouped.length?grouped.map(g=>`<div class="month-line"><b>${esc(g.month.replace('-','. '))}</b><div>${g.items.map(x=>`<span><strong>${esc(displaySemester(x.semester))}</strong> · ${esc(x.stage)}</span>`).join('')}</div></div>`).join(''):'<p class="muted">월별 계획이 아직 없습니다. 학습 계획 수정에서 자동 초안을 만들 수 있어요.</p>'}<h3 class="road-heading">현재 학기 학습 현황</h3><p class="small">${esc(p.semester)} · ${done}/${units.length}개 단원 개념 이상 완료 (${progress}%)</p><div class="bar"><span style="width:${progress}%"></span></div><div class="state-grid" style="margin-top:14px">${units.map((u,i)=>`<div class="state-item"><b>${i+1}. ${esc(u)}</b><small>${esc(states.find(x=>x[0]===(p.units[u]||'todo'))?.[1]||'예정')}</small></div>`).join('')}</div>${p.memo?`<h3 class="road-heading">선생님의 학습 방향</h3><div class="comment">${esc(p.memo)}</div>`:''}<p class="notice">학습 계획은 이해도와 평가 결과에 따라 조정됩니다.</p><div class="foot">미래엔영어수학 힘쎈플러스학원</div>`;
+ };
+ // Keep the existing browser storage key, paths and all management functions.
+ render();
+})();
+</script><style>
+#printRoadmap{display:none}
+@page{size:A4 portrait;margin:12mm}
+@media print{
+ html,body{margin:0!important;padding:0!important;background:white!important}
+ body>header,body>main,body>#toast{display:none!important}
+ #printRoadmap{display:block!important;font-family:system-ui,'Malgun Gothic',sans-serif;color:#193e30}
+ .print-sheet{height:271mm;position:relative;overflow:hidden;box-sizing:border-box;break-after:page;page-break-after:always}
+ .print-sheet:last-child{break-after:auto;page-break-after:auto}
+ .print-content{transform-origin:top left;width:100%}
+ .print-title{display:flex;justify-content:space-between;border-bottom:2px solid #07533d;padding-bottom:10px;margin-bottom:16px;font-size:13px;color:#07533d;font-weight:700}
+ .print-footer{position:absolute;bottom:0;left:0;right:0;border-top:1px solid #d4e6db;padding-top:7px;display:flex;justify-content:space-between;font-size:10px;color:#62756b;background:white}
+ #printRoadmap h2{font-size:28px;margin:10px 0}
+ #printRoadmap .road-heading{font-size:19px;margin:20px 0 10px}
+ #printRoadmap .identity{margin:10px 0 16px}
+ #printRoadmap .destination{padding:20px;margin:16px 0}
+ #printRoadmap .destination strong{font-size:34px}
+ #printRoadmap .map-group{grid-template-columns:75px 1fr}
+ #printRoadmap .map-tiles{grid-template-columns:repeat(6,1fr)}
+ #printRoadmap .map-tile{font-size:13px;padding:10px 3px}
+ #printRoadmap .month-line{padding:9px 12px;margin:5px 0;grid-template-columns:92px 1fr;gap:10px;font-size:14px}
+ #printRoadmap .state-grid{grid-template-columns:1fr 1fr;gap:6px}
+ #printRoadmap .state-item{font-size:13px;padding:9px}
+ #printRoadmap .comment{font-size:14px;line-height:1.6;padding:14px;overflow-wrap:anywhere}
+ #printRoadmap .small,#printRoadmap .notice{font-size:12px}
+ #printRoadmap *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style><div id="printRoadmap" aria-hidden="true"></div><script>
+(()=>{
+ function prepareTwoPages(){
+  const r=getReport(),root=$('printRoadmap');root.replaceChildren();if(!r)return;
+  const nodes=Array.from($('report').children);let second=false;const pages=[[],[]];
+  for(const node of nodes){if(node.classList.contains('foot'))continue;if(node.classList.contains('road-heading')&&node.textContent.includes('목표까지의 월별'))second=true;pages[second?1:0].push(node.cloneNode(true))}
+  pages.forEach((children,index)=>{
+   const sheet=document.createElement('section');sheet.className='print-sheet';
+   const content=document.createElement('div');content.className='print-content';
+   const title=document.createElement('div');title.className='print-title';const brand=document.createElement('span');brand.textContent='힘쎈플러스학원 · MATH NAVI';const subtitle=document.createElement('span');subtitle.textContent=index?'월별 계획 · 학습 점검':'개인별 수학 학습 로드맵';title.append(brand,subtitle);content.append(title);
+   if(index){const name=document.createElement('h2');name.textContent=r.s.name+' 학생의 학습 계획';content.append(name)}
+   children.forEach(n=>content.append(n));sheet.append(content);
+   const footer=document.createElement('div');footer.className='print-footer';const left=document.createElement('span');left.textContent=r.s.name+' · '+r.s.grade+' | 미래엔영어수학 힘쎈플러스학원';const right=document.createElement('span');right.textContent=(index+1)+' / 2';footer.append(left,right);sheet.append(footer);root.append(sheet);
+  });
+  // Measure in the actual print layout, then fit each complete page above its footer.
+  for(const sheet of root.children){const content=sheet.querySelector('.print-content'),footer=sheet.querySelector('.print-footer');const available=sheet.clientHeight-footer.offsetHeight-16;const actual=content.scrollHeight;if(actual>available){const scale=available/actual;content.style.transform='scale('+scale+')';content.style.width=(100/scale)+'%';const corrected=content.scrollHeight;if(corrected!==actual){const finalScale=Math.min(scale,available/corrected);content.style.transform='scale('+finalScale+')'}}}
+ }
+ window.addEventListener('beforeprint',prepareTwoPages);
+ $('print').textContent='A4 두 장 출력 / PDF';$('quickPrint').textContent='A4 두 장 인쇄';
+})();
 </script></body></html>
